@@ -1,4 +1,4 @@
-module github.com/chirpstack/chirpstack-rest-api
+module github.com/thebadking/chirpstack-rest-api
 
 go 1.23.0
 

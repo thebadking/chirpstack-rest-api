@@ -1,22 +1,26 @@
-FROM golang:1.24-alpine AS development
+FROM golang:1.22-alpine AS builder
+ENV CGO_ENABLED=0 \
+    GO111MODULE=on
 
-ENV PROJECT_PATH=/chirpstack-rest-api
-ENV PATH=$PATH:$PROJECT_PATH/build
-ENV CGO_ENABLED=0
-ENV GO_EXTRA_BUILD_ARGS="-a -installsuffix cgo"
+RUN apk update && \
+    apk add --no-cache ca-certificates build-base
 
-RUN apk add --no-cache ca-certificates make git bash
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
 
-RUN mkdir -p $PROJECT_PATH
-COPY . $PROJECT_PATH
-WORKDIR $PROJECT_PATH
+RUN go build -o chirpstack-rest-api .
 
-RUN make dev-requirements
-RUN make
 
-FROM alpine:3.21.0 AS production
+# ─── final stage ────────────────────────────────────────────────────────────────
+FROM alpine:3.18.0
 
-RUN apk --no-cache add ca-certificates
-COPY --from=development /chirpstack-rest-api/build/chirpstack-rest-api /usr/bin/chirpstack-rest-api
+# install CA certs so TLS works
+RUN apk add --no-cache ca-certificates
+
+COPY --from=builder /app/chirpstack-rest-api /usr/bin/chirpstack-rest-api
+
 USER nobody:nogroup
+
 ENTRYPOINT ["/usr/bin/chirpstack-rest-api"]
